@@ -7,18 +7,13 @@ import android.graphics.*
 import android.graphics.drawable.*
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.rememberScrollableState
-import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -34,67 +29,75 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.liveData
 import dev.tiltmann.opensourcelauncher.ui.theme.OpenSourceLauncherTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
 
+    private val installedAppsViewModel: InstalledAppsViewModel by viewModels()
+
     @ExperimentalFoundationApi
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val installedAppsViewModel by viewModels<InstalledAppsViewModel>()
-
         setContent {
             OpenSourceLauncherTheme {
                 Surface(color = MaterialTheme.colors.background) {
-                    Row {
-                        AppListComposable(installedAppsViewModel)
-                    }
+                    MainScreen()
                 }
             }
         }
     }
 
     @Composable
-    private fun DraggableScrollbar() {
-        var offset by remember { mutableStateOf(0f) }
+    private fun MainScreen() {
+        val appListScrollState = rememberScrollState()
+
+        val groupedApps = installedAppsViewModel.groupedApps.observeAsState().value
+        if (groupedApps == null) {
+            Text(modifier = Modifier.padding(8.dp), text = "Loading Apps")
+            return
+        }
+
+        Row {
+            ScrollableAppList(Modifier.weight(1f), groupedApps, appListScrollState)
+            DraggableScrollbar(appListScrollState)
+        }
+    }
+
+    @Composable
+    private fun DraggableScrollbar(appListScrollState: ScrollState) {
+
+        val scope = rememberCoroutineScope()
 
         Box(
             Modifier
-                .size(150.dp)
-                .scrollable(
+                .width(50.dp)
+                .fillMaxHeight()
+                .draggable(
                     orientation = Orientation.Vertical,
-                    // Scrollable state: describes how to consume
-                    // scrolling delta and update offset
-                    state = rememberScrollableState { delta ->
-                        offset += delta
-                        delta
-                    }
+                    state = rememberDraggableState { delta ->
+                        scope.launch {
+                            appListScrollState.scrollBy(delta * 6)
+                        }
+                    },
                 )
-                .background(Color.LightGray),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(offset.toString())
-        }
+                .background(Color.White.copy(alpha = 0.2f)),
+        )
 
     }
 
     @Composable
-    @ExperimentalFoundationApi
-    private fun AppListComposable(appsViewModel: InstalledAppsViewModel) {
+    private fun ScrollableAppList(
+        modifier: Modifier = Modifier,
+        groupedApps: Map<Char, List<InstalledAppInfo>>,
+        scrollState: ScrollState
+    ) {
 
-        val groupedAppsState = appsViewModel.groupedApps.observeAsState()
-        val groupedApps = groupedAppsState.value
+        // Sadly, LazyColumn is having some problems, is being too laggy
+        Column(modifier.verticalScroll(scrollState)) {
 
-        Log.e("Hannes", "rendered app list newly")
-
-        if (groupedApps == null) {
-            Text(text = "Loading Apps")
-            return
-        }
-        // Sadly, LazyColumn is having some problems, is being to laggy
-        Column(Modifier.verticalScroll(rememberScrollState())) {
             for ((char, list) in groupedApps) {
                 Text(char.uppercase(), fontWeight = FontWeight.ExtraBold)
                 list.forEach {
