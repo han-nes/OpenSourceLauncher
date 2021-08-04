@@ -11,19 +11,14 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -41,7 +36,6 @@ import dev.tiltmann.opensourcelauncher.ui.theme.OpenSourceLauncherTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
-
 
 class MainActivity : ComponentActivity() {
 
@@ -63,6 +57,30 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun DraggableScrollbar() {
+        var offset by remember { mutableStateOf(0f) }
+
+        Box(
+            Modifier
+                .size(150.dp)
+                .scrollable(
+                    orientation = Orientation.Vertical,
+                    // Scrollable state: describes how to consume
+                    // scrolling delta and update offset
+                    state = rememberScrollableState { delta ->
+                        offset += delta
+                        delta
+                    }
+                )
+                .background(Color.LightGray),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(offset.toString())
+        }
+
+    }
+
+    @Composable
     @ExperimentalFoundationApi
     private fun AppListComposable(appsViewModel: InstalledAppsViewModel) {
 
@@ -75,20 +93,16 @@ class MainActivity : ComponentActivity() {
             Text(text = "Loading Apps")
             return
         }
-
-        LazyColumn(contentPadding = PaddingValues(8.dp)) {
+        // Sadly, LazyColumn is having some problems, is being to laggy
+        Column(Modifier.verticalScroll(rememberScrollState())) {
             for ((char, list) in groupedApps) {
-                // if it runs nicely, use 'stickyHeader'
-                item {
-                    Text(char.uppercase(), fontWeight = FontWeight.ExtraBold)
-                }
-
-                items(list) {
+                Text(char.uppercase(), fontWeight = FontWeight.ExtraBold)
+                list.forEach {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clickable {
-                                if (it.intent == null) return@clickable;
+                                if (it.intent == null) return@clickable
                                 startActivity(it.intent)
                             }
                             .fillMaxWidth()
@@ -104,6 +118,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+class DraggableScrollBarViewModel(application: Application) : AndroidViewModel(application) {
+    val lazyListState = LazyListState()
+}
+
 
 data class InstalledAppInfo(
     val label: String,
